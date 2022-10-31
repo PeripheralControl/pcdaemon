@@ -44,7 +44,7 @@ an FPGA card, pcdaemon, and your application. <br>
 multiplexer for packets to and from the FPGA and for data to
 and from other devices and services.  While FPGA based peripherals
 are the focus, pcdaemon also includes drivers for a gamepad,
-GPS receiver, voice output, and an IRC client.  Once you have
+GPS receiver, text-to-speech, and an IRC client.  Once you have
 pcdaemon controlling FPGA based peripherals you may find you want
 its API for all of your devices and services.
 
