@@ -118,6 +118,7 @@ struct PDESC pdesc[] = {
     {"tang4k", 44, "tang4k", 0x0, 0 },
     {"tonegen", 45, "tonegen", 0x0f, 4 },
     {"stpxo2", 46, "stpxo2", 0x0, 0 },
+    {"basys3", 47, "basys3", 0x0, 0 },
 };
 
 #define NPERI (sizeof(pdesc) / sizeof(struct PDESC))
