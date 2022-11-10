@@ -66,6 +66,7 @@ all:
 	make -C serout all
 	make -C hostserial all
 	make -C bootflash all
+	make -C cvcc all
 
 clean:
 	make -C enumerator clean
@@ -114,6 +115,7 @@ clean:
 	make -C serout clean
 	make -C hostserial clean
 	make -C bootflash clean
+	make -C cvcc clean
 
 install:
 	make INST_LIB_DIR=$(INST_LIB_DIR) -C enumerator install
@@ -162,6 +164,7 @@ install:
 	make INST_LIB_DIR=$(INST_LIB_DIR) -C serout install
 	make INST_LIB_DIR=$(INST_LIB_DIR) -C hostserial install
 	make INST_LIB_DIR=$(INST_LIB_DIR) -C bootflash install
+	make INST_LIB_DIR=$(INST_LIB_DIR) -C cvcc install
 	sudo ldconfig
 
 uninstall:
@@ -211,6 +214,7 @@ uninstall:
 	make INST_LIB_DIR=$(INST_LIB_DIR) -C serout uninstall
 	make INST_LIB_DIR=$(INST_LIB_DIR) -C hostserial install
 	make INST_LIB_DIR=$(INST_LIB_DIR) -C bootflash uninstall
+	make INST_LIB_DIR=$(INST_LIB_DIR) -C cvcc uninstall
 	sudo ldconfig
 
 .PHONY : clean install uninstall
