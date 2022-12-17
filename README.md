@@ -54,8 +54,7 @@ its API for all of your devices and services.
 ### Invocation and Options
 Build and install pcdaemon with the following commands:
 ``` 
-        XXXXXXX
-        git clone XXXXXX
+        git clone https://github.com/PeripheralControl/pcdaemon.git
         cd pcdaemon
         make
         sudo make install
@@ -65,7 +64,7 @@ The default installation directories are /usr/local/bin and
 /usr/local/lib/pc. You can examine /usr/local/lib/pc to see the .so
 files that are the individual peripheral drivers.
 
-Pcdaemon has several options to let you customize its behaviour.
+Pcdaemon has several options to let you customize its behavior.
 ```
     pcdaemon [options] 
      options:
@@ -148,7 +147,7 @@ the dual quadrature decoder and start its stream of data:
     read : "1   0.007474   0   0.000000"
     read : "0   0.000000   0   0.000000"
 
-By default pcdaemon will interogate an attached FPGA to find what 
+By default pcdaemon will interrogate an attached FPGA to find what 
 drivers it needs.  Drivers (again, shared object plug-in modules)
 for non-FPGA based peripherals need to be loaded explicitly.  Load
 the text-to-speech driver, set the voice to awb, and say "hello
@@ -218,8 +217,8 @@ information on these peripherals.
 |[ping4](fpga-drivers/ping4/readme.txt)| Quad Parallax PING))) interface |
 |[sr04](fpga-drivers/sr04/readme.txt)| Octal SRF04 interface (hw) |
 |[count4](fpga-drivers/count4/readme.txt)| Quad event counter |
-|[qtr4](fpga-drivers/qtr4/readme.txt)| Quad Pololu QTR interface |
-|[qtr8](fpga-drivers/qtr8/readme.txt)| Octal Pololu QTR interface |
+|[rcc4](fpga-drivers/rcc4/readme.txt)| Quad RC discharge timer |
+|[rcc8](fpga-drivers/rcc8/readme.txt)| Octal RC discharge timer |
 |[espi](fpga-drivers/espi/readme.txt)| SPI interface (hw) |
 |[ei2c](fpga-drivers/ei2c/readme.txt)| I2C interface (hw) |
 |[dac8](fpga-drivers/dac8/readme.txt)| Octal 8-bit DAC (hw) |

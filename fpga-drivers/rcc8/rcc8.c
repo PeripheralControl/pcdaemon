@@ -1,21 +1,22 @@
 /*
- *  Name: qtr.c
+ *  Name: rcc.c
  *
- *  Description: Interface to four Pololu QTR-RC proximity sensors
+ *  Description: Resistor Capacitor analog to digital Converter (rcc)
  *
  *  Hardware Registers:
- *    0  :     - Low 4/8 bits have sensor status.  1==dark  0==light
- *    1  :     - Sensitivity.  An 8 bit value of 10us steps to wait before reading
- *    2  :     - Sample period in units of 10ms from 1 to 15.  0 turns sensor off
+ *    0-7 :    - time for 0->1 or 1->0 transition
+ *    8   :    - Config
+ *             bit 6:     polarity.  Set to 1 for a 1->0 transition
+ *             Bits 4-5:  clock source. 0=10MHz, 1=1MHz, 2=100KHz, 3=10KHz
+ *             Bits 0-3:  Sample period in units of 10ms from 1 to 15.  0 is off
  * 
  *  Resources:
- *    qtrval   - QTR status as a single hex number - a set bit is black
- *    update_period - update period in ms. _0_ is off. Range is 10 to 150.
- *    sensitivity - 1 to 250 with higher number being more sensitive to white
+ *    rccval   - RCC times as 4/8 two digit hex numbers
+ *    config   - polarity, clock rate, update period
  */
 
 /*
- * Copyright:   Copyright (C) 2014-2020 Demand Peripherals, Inc.
+ * Copyright:   Copyright (C) 2014-2022 Demand Peripherals, Inc.
  *              All rights reserved.
  *
  * License:     This program is free software; you can redistribute it and/or
@@ -33,20 +34,14 @@
  */
 
 /*
- *    The qtr provides 4 or 8 channels of input from a Pololu QTR-RC sensor.
+ *    The rcc provides 4 or 8 channels of input from an Resistor/Capacitor
+ *    discharge circuit like that of the  Pololu QTR-RC sensor.
  *    The sensors work by charging a capacitor to Vcc (3.3 volts in our case)
  *    and monitoring the capacitor discharge.  The discharge rate depends on
- *    the amount of IR light reflected off a surface and onto a phototransistor.
- *    A sensor is considered light if the capacitor has discharged below the
- *    logic '1' level of the FPGA and is considered dark if the voltage is
- *    still above the logic 1 level.  Sensitivity is controlled by a delay in
- *    reading the inputs.  The longer the delay, the longer the cap has to
- *    discharge.  Sensitivity is in units of 10us but since the discharge of
- *    a capacitor is exponential the sensitivity is very non-linear. Values
- *    in the range of 5 to 25 seem to work fairly well.
+ *    the amount of current flowing into from a resistor or a phototransistor.
+ *    The time to discharge from 1 to 0 is reports as the reading.  This is
+ *    a simple but relatively inaccurate analog to digital converter.
  *      
- *    The minimum update period is 10 milliseconds and the maximum is 150.
- *
  */
 
 
@@ -65,30 +60,34 @@
 /**************************************************************
  *  - Limits and defines
  **************************************************************/
-        // QTR register definitions
-#define QTR_DATA           0x00
-#define QTR_SENS           0x01
-#define QTR_UPDATE         0x02
+        // RCC register definitions
+#define RCC_DATA            0x00
+#ifdef RCC4
+    #define RCC_CONFIG      0x04
+    #define NPINS           4
+#else
+    #define RCC_CONFIG      0x08
+    #define NPINS           8
+#endif
         // resource names and numbers
-#define FN_DATA             "qtrval"
-#define FN_SENS             "sensitivity"
-#define FN_UPDATE           "update_period"
+#define FN_DATA             "rccval"
+#define FN_CONFIG           "config"
 #define RSC_DATA            0
-#define RSC_SENS            1
-#define RSC_UPDATE          2
+#define RSC_CONFIG          1
 
 
 /**************************************************************
  *  - Data structures
  **************************************************************/
-    // All state info for an instance of an qtr
+    // All state info for an instance of an rcc
 typedef struct
 {
     void    *pslot;    // handle to peripheral's slot info
     uint8_t  update;   // update rate for sampling 0=off, 1=10ms, ....
-    uint8_t  sensitivity;   // sensitivity in range of 1 to 250
+    uint8_t  clksrc;   // Clock rate. 0=10M, 1=1M, 2=100K, 3=10k
+    uint8_t  polarity; // ==1 for a 1->0 transition
     void    *ptimer;   // timer to watch for dropped ACK packets
-} QTRDEV;
+} RCCDEV;
 
 
 /**************************************************************
@@ -96,8 +95,8 @@ typedef struct
  **************************************************************/
 static void packet_hdlr(SLOT *, PC_PKT *, int);
 static void userconfig(int, int, char*, SLOT*, int, int*, char*);
-static void noAck(void *, QTRDEV *);
-static void sendconfigtofpga(QTRDEV *, int *plen, char *buf);
+static void noAck(void *, RCCDEV *);
+static void sendconfigtofpga(RCCDEV *, int *plen, char *buf);
 
 
 /**************************************************************
@@ -107,19 +106,21 @@ static void sendconfigtofpga(QTRDEV *, int *plen, char *buf);
 int Initialize(
     SLOT *pslot)       // points to the SLOT for this peripheral
 {
-    QTRDEV  *pctx;    // our local device context
+    RCCDEV  *pctx;    // our local device context
 
     // Allocate memory for this peripheral
-    pctx = (QTRDEV *) malloc(sizeof(QTRDEV));
-    if (pctx == (QTRDEV *) 0) {
+    pctx = (RCCDEV *) malloc(sizeof(RCCDEV));
+    if (pctx == (RCCDEV *) 0) {
         // Malloc failure this early?
-        pclog("memory allocation failure in qtr initialization");
+        pclog("memory allocation failure in rcc initialization");
         return (-1);
     }
 
-    // Init our QTRDEV structure
+    // Init our RCCDEV structure
     pctx->pslot = pslot;       // our instance of a peripheral
     pctx->update = 0;          // default value matches power up default==off
+    pctx->clksrc = 0;          // 10MHz
+    pctx->polarity = 0;        // watch for a 0->1 transition
     pctx->ptimer = 0;          // set while waiting for a response
 
     // Register this slot's packet handler and private data
@@ -133,24 +134,18 @@ int Initialize(
     pslot->rsc[RSC_DATA].pgscb = 0;
     pslot->rsc[RSC_DATA].uilock = -1;
     pslot->rsc[RSC_DATA].slot = pslot;
-    pslot->rsc[RSC_SENS].name = FN_SENS;
-    pslot->rsc[RSC_SENS].flags = IS_READABLE | IS_WRITABLE;
-    pslot->rsc[RSC_SENS].bkey = 0;
-    pslot->rsc[RSC_SENS].pgscb = userconfig;
-    pslot->rsc[RSC_SENS].uilock = -1;
-    pslot->rsc[RSC_SENS].slot = pslot;
-    pslot->rsc[RSC_UPDATE].name = FN_UPDATE;
-    pslot->rsc[RSC_UPDATE].flags = IS_READABLE | IS_WRITABLE;
-    pslot->rsc[RSC_UPDATE].bkey = 0;
-    pslot->rsc[RSC_UPDATE].pgscb = userconfig;
-    pslot->rsc[RSC_UPDATE].uilock = -1;
-    pslot->rsc[RSC_UPDATE].slot = pslot;
-    #ifdef QTR4
-        pslot->name = "qtr4";
+    pslot->rsc[RSC_CONFIG].name = FN_CONFIG;
+    pslot->rsc[RSC_CONFIG].flags = IS_READABLE | IS_WRITABLE;
+    pslot->rsc[RSC_CONFIG].bkey = 0;
+    pslot->rsc[RSC_CONFIG].pgscb = userconfig;
+    pslot->rsc[RSC_CONFIG].uilock = -1;
+    pslot->rsc[RSC_CONFIG].slot = pslot;
+    #ifdef RCC4
+        pslot->name = "rcc4";
     #else
-        pslot->name = "qtr8";
+        pslot->name = "rcc8";
     #endif
-    pslot->desc = "Pololu QTR-RC sensor";
+    pslot->desc = "Resistor Capacitor discharge timer";
     pslot->help = README;
 
 
@@ -170,14 +165,13 @@ static void packet_hdlr(
     PC_PKT  *pkt,      // the received packet
     int      len)      // number of bytes in the received packet
 {
-    QTRDEV   *pctx;    // our local info
+    RCCDEV   *pctx;    // our local info
     RSC      *prsc;    // pointer to this slot's counts resource
-    uint8_t   qtrval;  // data from sensor
-    char      qstr[10]; // one char and a newline
+    char      qstr[100]; // up to eight space separated two digit numbers
     int       qlen;    // length of line to send
 
 
-    pctx = (QTRDEV *)(pslot->priv);  // Our "private" data
+    pctx = (RCCDEV *)(pslot->priv);  // Our "private" data
     prsc = &(pslot->rsc[RSC_DATA]);
 
     // Clear the timer on write response packets
@@ -189,23 +183,23 @@ static void packet_hdlr(
 
     // Do a sanity check on the received packet.  Only reads from
     // the data register should come in since we don't ever read
-    // the sensitivity or update period
-    // (one 8 bit number takes _1_ byte.)
-    if ((pkt->reg != QTR_DATA) || (pkt->count != 1)) {
-        pclog("invalid qtr packet from board to host");
+    // the config
+    // Packet has one byte per input pin.
+    if ((pkt->reg != RCC_DATA) || (pkt->count != NPINS)) {
+        pclog("invalid rcc packet from board to host");
         return;
     }
-
-    // Get counts and timestamps
-    qtrval = pkt->data[0];
 
     // Process of elimination makes this an autosend packet.
     // Broadcast it if any UI are monitoring it.
     if (prsc->bkey != 0) {
-        #ifdef QTR4
-            qlen = sprintf(qstr, "%01x\n", qtrval);
+        #ifdef RCC4
+            qlen = sprintf(qstr, "%02x %02x %02x %02x\n", pkt->data[0], pkt->data[1],
+                   pkt->data[2], pkt->data[3]);
         #else
-            qlen = sprintf(qstr, "%02x\n", qtrval);  // qtr8
+            qlen = sprintf(qstr, "%02x %02x %02x %02x %02x %02x %02x %02x\n", pkt->data[0],
+                   pkt->data[1], pkt->data[2], pkt->data[3], pkt->data[4], pkt->data[5],
+                   pkt->data[6], pkt->data[7]);
         #endif
         // bkey will return cleared if UIs are no longer monitoring us
         bcst_ui(qstr, qlen, &(prsc->bkey));
@@ -228,47 +222,40 @@ static void userconfig(
     int     *plen,     // size of buf on input, #char in buf on output
     char    *buf)
 {
-    QTRDEV  *pctx;     // our local info
+    RCCDEV  *pctx;     // our local info
     int      ret;      // return count
-    int      newsens;  // new value to assign the sensitivity
-    int      newupdate;  // new value to assign the update period
+    int      nupdate;  // new value for the update rate
+    int      nclk;     // new value for the clock source
+    int      npol;     // new value for the polarity
 
-    pctx = (QTRDEV *) pslot->priv;
+    pctx = (RCCDEV *) pslot->priv;
 
-    if ((cmd == PCGET) && (rscid == RSC_SENS)) {
-        // value of 1 to 250
-        ret = snprintf(buf, *plen, "%d\n", pctx->sensitivity);
+    if ((cmd == PCGET) && (rscid == RSC_CONFIG)) {
+        // Give config to user
+        ret = snprintf(buf, *plen, "%d %s %d\n", pctx->polarity,
+               (pctx->clksrc ==0) ? "10000000" :
+               (pctx->clksrc ==1) ? "1000000" :
+               (pctx->clksrc ==2) ? "100000" : "10000",
+               (pctx->update * 10));
         *plen = ret;  // (errors are handled in calling routine)
         return;
     }
-    else if ((cmd == PCSET) && (rscid == RSC_SENS)) {
-        // value of 1 to 250
-        ret = sscanf(val, "%d", &newsens);
-        if ((ret != 1) || (newsens < 1) || (newsens > 250)) {
-            ret = snprintf(buf, *plen, E_BDVAL, pslot->rsc[rscid].name);
-            *plen = ret;
-            return;
-        }
-
-        pctx->sensitivity = newsens;
-        sendconfigtofpga(pctx, plen, buf);  // send down new config
-    }
-    else if ((cmd == PCGET) && (rscid == RSC_UPDATE)) {
-        // Update period in milliseconds
-        ret = snprintf(buf, *plen, "%d\n", (pctx->update * 10));
-        *plen = ret;  // (errors are handled in calling routine)
-        return;
-    }
-    else if ((cmd == PCSET) && (rscid == RSC_UPDATE)) {
+    else if ((cmd == PCSET) && (rscid == RSC_CONFIG)) {
         // Update period is 0 to 150 
-        ret = sscanf(val, "%d", &newupdate);
-        if ((ret != 1) || (newupdate < 0) || (newupdate > 150)) {
+        ret = sscanf(val, "%d %d %d", &npol, &nclk, &nupdate);
+        if ((ret != 3) || (nupdate < 0) || (nupdate > 150) ||
+            ((npol != 0) && (npol != 1)) || ((nclk != 10000000) &&
+             (nclk != 1000000) && (nclk != 100000) && (nclk != 10000))) {
             ret = snprintf(buf, *plen, E_BDVAL, pslot->rsc[rscid].name);
             *plen = ret;
             return;
         }
 
-        pctx->update = newupdate / 10;      // steps of 10 ms each
+        pctx->polarity = npol;              // record new polarity
+        pctx->clksrc = (nclk == 10000000) ? 0 :
+                       (nclk == 1000000) ? 1 :
+                       (nclk == 100000) ? 2 : 3;
+        pctx->update = nupdate / 10;        // steps of 10 ms each
         sendconfigtofpga(pctx, plen, buf);  // send down new config
     }
 
@@ -281,11 +268,11 @@ static void userconfig(
  * Put error messages into buf and update plen.
  **************************************************************/
 static void sendconfigtofpga(
-    QTRDEV   *pctx,    // This peripheral's context
+    RCCDEV   *pctx,    // This peripheral's context
     int      *plen,    // size of buf on input, #char in buf on output
     char     *buf)     // where to store user visible error messages
 {
-    PC_PKT   pkt;      // send write and read cmds to the qtr
+    PC_PKT   pkt;      // send write and read cmds to the rcc
     SLOT    *pslot;    // This peripheral's slot info
     CORE    *pmycore;  // FPGA peripheral info
     int      txret;    // ==0 if the packet went out OK
@@ -298,10 +285,9 @@ static void sendconfigtofpga(
     // down to the card.
     pkt.cmd = PC_CMD_OP_WRITE | PC_CMD_AUTOINC;
     pkt.core = pmycore->core_id;
-    pkt.reg = QTR_SENS;      // send sensitivity and update period
-    pkt.count = 2;
-    pkt.data[0] = pctx->sensitivity;
-    pkt.data[1] = pctx->update;
+    pkt.reg = RCC_CONFIG;      // send config
+    pkt.count = 1;
+    pkt.data[0] = (pctx->polarity << 6) + (pctx->clksrc << 4) + pctx->update;
     txret = pc_tx_pkt(pmycore, &pkt, 4 + pkt.count); // 4 header + data
 
     if (txret != 0) {
@@ -327,7 +313,7 @@ static void sendconfigtofpga(
  **************************************************************/
 static void noAck(
     void     *timer,   // handle of the timer that expired
-    QTRDEV   *pctx)    // Send pin values of this qtr to the FPGA
+    RCCDEV   *pctx)    // 
 {
     // Log the missing ack
     pclog(E_NOACK);
@@ -335,4 +321,4 @@ static void noAck(
     return;
 }
 
-// end of qtr.c
+// end of rcc.c
