@@ -20,21 +20,12 @@ default values are zero and zero.
 
 viin : The voltage and current at the load as a percent of
 full scale. The resource works with pccat and pcget.  When
-used with pccat the update rate is about 50Hz.
-
-conf : The frequency of the clock driving the output FET 
-and divide constant that generates the input PWM rates.
-Frequency is given in Hertz and is rounded to the nearest
-whole multiple of 20 MHz.  The divide constant must be a
-multiple of 2 in the range of 2 to 64.  This resource works
-with pcget and pcset.  The default values are 1 MHz and 16.
+used with pccat the update rate is about 10Hz.
 
 
 EXAMPLES
 # Turn off the outputs
 pcset cvcc viout 0 0
-# Set the frequency to 1 MHz and the divider to 16
-pcset cvcc conf 1000000 16
 # Set the the voltage limit to # 50 percent of full scale and
 # current limit to maximum.  This is constant voltage mode.
 pcset cvcc viout 50 100

@@ -4,17 +4,17 @@
  *  Description: Driver CVCC programmable power supply by Jerry O'Keefe
  *
  *  Hardware Registers:
- *    0,1: vlin    - Load voltage
- *    2,3: ilin    - Load current
- *    4,5: vset    - Maximum voltage to the load
- *    6,7: iset    - Maximum current to the load
- *    8:   freq    - Divider of 20 MHz to get FET clock
- *    9:   rdiv    - Divider of freq to get counter reset clock
+ *   0,1:   vlin    - Load voltage (high,low)
+ *   2,3:   ilin    - Load current
+ *   4,5:   vref    - PWM width of Vref
+ *   6,7    per     - Period of Vref in units of 10 ns
+ *   8,9:   vset    - Maximum voltage to the load
+ *   10,11: iset    - Maximum current to the load
+ *   12:            - Enable
  * 
  *  Resources:
  *    viout        - Maximum voltage and current settings
  *    viin         - Measured load voltage and current
- *    conf         - The FET clock rate and reset divide constant
  *
  * Copyright:   Copyright (C) 2022 Demand Peripherals, Inc.
  *              All rights reserved.
@@ -51,8 +51,7 @@
  **************************************************************/
         // CVCC register definitions
 #define CVCC_REG_VIIN      0x00
-#define CVCC_REG_VIOUT     0x01
-#define CVCC_REG_CONF      0x02
+#define CVCC_REG_VIOUT     0x08
         // resource names and numbers
 #define FN_VIIN            "viin"
 #define FN_VIOUT           "viout"
@@ -63,7 +62,7 @@
         // Length of output string for load V/I
 #define NLOADSTR           50
         // Full scale bits
-#define FULLSCALE          4096
+#define FULLSCALE          1023
 
 /**************************************************************
  *  - Data structures
@@ -76,8 +75,6 @@ typedef struct
     int      iin;      // the measured load current
     int      vout;     // the user set output voltage as a percent
     int      iout;     // the user set output current as a percent
-    int      freq;     // the desired FET frequency == 20MHz/freq
-    int      rdiv;     // reset frequency is freq divided by rdiv
     void    *ptimer;   // timer to watch for dropped ACK packets
 } CVCCDEV;
 
@@ -113,8 +110,6 @@ int Initialize(
     pctx->pslot = pslot;       // our instance of a peripheral
     pctx->vout = 0;
     pctx->iout = 0;
-    pctx->freq = 20;           // Default is 1 MHz (== 20MHz / 20)
-    pctx->iout = 16;           // Default is 16 freq pulses per counter reset
     pctx->ptimer = 0;          // set while waiting for a response
 
 
@@ -165,6 +160,7 @@ static void packet_hdlr(
     RSC    *prsc;      // pointer to the V/I input resource
     char    loadstr[NLOADSTR];  // Load V/I as a string
     int     ldlen;     // length of loadstr
+    float   period;    // period of PWM inputs in units of 160 ns
 
     pctx = (CVCCDEV *)(pslot->priv);  // Our "private" data is a CVCCDEV
     prsc = &(pslot->rsc[RSC_VIIN]);
@@ -181,7 +177,7 @@ static void packet_hdlr(
     // Do a sanity check on the received packet.  Only reads from
     // the viin should come in since we don't ever read the set values
     // or the configuration
-    if ((pkt->reg != CVCC_REG_VIIN) || (pkt->count != 4)) {
+    if ((pkt->reg != CVCC_REG_VIIN) || (pkt->count != 8)) {
         pclog("invalid cvcc packet from board to host");
         return;
     }
@@ -189,9 +185,13 @@ static void packet_hdlr(
     // Process of elimination makes this an autosend packet.
     // Broadcast it if any UI are monitoring it.
     if (prsc->bkey != 0) {
-        ldlen = snprintf(loadstr, NLOADSTR, "%3.1d %3.1d\n", 
-                       ((pkt->data[0] << 8) + pkt->data[1]) / FULLSCALE,
-                       ((pkt->data[2] << 8) + pkt->data[3]) / FULLSCALE);
+        period = (float)((pkt->data[6] << 8) + pkt->data[7]);
+
+        ldlen = snprintf(loadstr, NLOADSTR, "%3.1f %3.1f %3.1f %3.1f\n", 
+                       (100.0)*((pkt->data[0] << 8) + pkt->data[1]) / period,
+                       (100.0)*((pkt->data[2] << 8) + pkt->data[3]) / period,
+                       (100.0)*((pkt->data[4] << 8) + pkt->data[5]) / period,
+                       (100000.0 / (period / 16.0)));
         // bkey will return cleared if UIs are no longer monitoring us
         bcst_ui(loadstr, ldlen, &(prsc->bkey));
         return;
@@ -217,8 +217,6 @@ static void usercmd(
     CVCCDEV *pctx;    // our local info
     float    newv;     // new value of the set voltage
     float    newi;     // new value of the set current
-    int      newfreq;  // new frequency
-    int      newrdiv;  // new divider value
     int      ret;      // sprintf count
 
     pctx = (CVCCDEV *) pslot->priv;
@@ -226,34 +224,16 @@ static void usercmd(
     // A read of V or I in?
     if ((cmd == PCGET) && (rscid == RSC_VIIN )) {
         ret = snprintf(buf, *plen, "%3.1f %3.1f\n", 
-                         (float)(pctx->iin)/(float) FULLSCALE,
-                         (float)(pctx->vin)/(float) FULLSCALE);
+                         (float)(pctx->vin)/(float) FULLSCALE,
+                         (float)(pctx->iin)/(float) FULLSCALE);
         *plen = ret;  // (errors are handled in calling routine)
         return;
     }
     else if ((cmd == PCGET) && (rscid == RSC_VIOUT )) {
         ret = snprintf(buf, *plen, "%3.1f %3.1f\n", 
-                         (float)(pctx->iout)/(float) FULLSCALE,
-                         (float)(pctx->vout)/(float) FULLSCALE);
+                         (float)(pctx->vout)/(float) FULLSCALE,
+                         (float)(pctx->iout)/(float) FULLSCALE);
         *plen = ret;  // (errors are handled in calling routine)
-        return;
-    }
-    else if ((cmd == PCGET) && (rscid == RSC_CONF )) {
-        ret = snprintf(buf, *plen, "%d %d\n", pctx->freq * 20, pctx->rdiv);
-        *plen = ret;  // (errors are handled in calling routine)
-        return;
-    }
-    else if ((cmd == PCSET) && (rscid == RSC_CONF )) {
-        ret = sscanf(val, "%d %d", &newfreq, &newrdiv);
-        if ((ret != 2) || (newfreq < 0) || (newfreq > 20000000) ||
-            (newrdiv < 0) || (newrdiv > 255)) {
-            ret = snprintf(buf, *plen,  E_BDVAL, pslot->rsc[rscid].name);
-            *plen = ret;
-            return;
-        }
-        pctx->freq = 20000000 / newfreq ;
-        pctx->rdiv = newrdiv;
-        sendconfigtofpga(pctx, plen, buf);  // send new config to board
         return;
     }
     else if ((cmd == PCSET) && (rscid == RSC_VIOUT )) {
@@ -266,6 +246,7 @@ static void usercmd(
         }
         pctx->vout = (newv * FULLSCALE) / 100;
         pctx->iout = (newi * FULLSCALE) / 100;
+printf("new vout/iout = %d %d\n", pctx->vout,pctx->iout);
         sendconfigtofpga(pctx, plen, buf);  // send new config to board
         return;
     }
@@ -295,13 +276,12 @@ static void sendconfigtofpga(
     pkt.cmd = PC_CMD_OP_WRITE | PC_CMD_AUTOINC;
     pkt.core = pmycore->core_id;
     pkt.reg = CVCC_REG_VIOUT;   // the first reg of the three
-    pkt.count = 6;
+    pkt.count = 5;
     pkt.data[0] = pctx->vout >> 8;
-    pkt.data[1] = pctx->vout && 0xff;
+    pkt.data[1] = pctx->vout & 0xff;
     pkt.data[2] = pctx->iout >> 8;
-    pkt.data[3] = pctx->iout && 0xff;
-    pkt.data[4] = pctx->freq;
-    pkt.data[5] = pctx->rdiv;
+    pkt.data[3] = pctx->iout & 0xff;
+    pkt.data[4] = (pctx->vout != 0) && (pctx->iout != 0);
     txret = pc_tx_pkt(pmycore, &pkt, 4 + pkt.count); // 4 header + data
 
     if (txret != 0) {
