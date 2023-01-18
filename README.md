@@ -241,4 +241,5 @@ information on these peripherals.
 |[gps](drivers/gps/readme.txt) | GPS Interface |
 |[hello](drivers/hellodemo/readme.txt) | Hello World Sample |
 |[irc](drivers/irccom/readme.txt) | IRC Peer-to-Peer Communications |
+|[isl29125](drivers/isl29125/readme.txt) | ISL29125 RGB Sensor |
 
