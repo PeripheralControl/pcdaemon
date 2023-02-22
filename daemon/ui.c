@@ -471,10 +471,8 @@ void prompt(
         if ((nwr < 0) && (errno == EAGAIN)) {
             continue;      // recoverable error, try again
         }
-        else {
-            if (nwr < 0) {
-                pclog(M_BADCONN, errno);  // conn error.  Log it.
-            }
+        else if (nwr <= 0) {
+            pclog(M_BADCONN, errno);  // conn error.  Log it.
             close_ui_conn(cn);  // close on EOF or error
             return;
         }
