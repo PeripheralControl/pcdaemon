@@ -224,12 +224,9 @@ static void usercmd(
     int     *plen,     // size of buf on input, #char in buf on output
     char    *buf)
 {
-    ENUMDEV *pctx;    // our local info
     int       ret;     // return count
     int       i;       // loop counter
 
-
-    pctx = (ENUMDEV *) pslot->priv;
 
     if ((cmd == PCGET) && (rscid == RSC_DRIVLIST)) {
         // verify there is room in the buffer for the output.  Each

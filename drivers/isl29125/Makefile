@@ -1,9 +1,9 @@
 #
 #  Name: Makefile
 #
-#  Description: This is the Makefile for a peripheral plugin
+#  Description: This is the Makefile for the hellodemo plugin
 #
-#  Copyright:   Copyright (C) 2014-2019 by Demand Peripherals, Inc.
+#  Copyright:   Copyright (C) 2019 by Demand Peripherals, Inc.
 #               All rights reserved.
 #
 #  License:     This program is free software; you can redistribute it and/or
@@ -15,25 +15,23 @@
 #               MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 #               GNU General Public License for more details.
 #
-#               Please contact Demand Peripherals if you wish to use this code
-#               in a non-GPLv2 compliant manner.
 #
 
-peripheral_name = qtr4
+plugin_name = isl29125
 
 INC = ../../include
 LIB = ../../build/lib
 OBJ = ../../build/obj
 
-includes = $(INC)/pcdaemon.h readme.h
+includes = $(INC)/daemon.h readme.h
 
-# define target peripheral/driver here
-object = $(OBJ)/$(peripheral_name).o
-shared_object = $(LIB)/$(peripheral_name).$(SO_EXT)
+# define target plug-in here
+object = $(OBJ)/$(plugin_name).o
+shared_object = $(LIB)/$(plugin_name).$(SO_EXT)
 
 DEBUG_FLAGS = -g
 RELEASE_FLAGS = -O3
-CFLAGS = -I$(INC) $(DEBUG_FLAGS) -fPIC -c -Wall -DQTR4
+CFLAGS = -I$(INC) $(DEBUG_FLAGS) -fPIC -c -Wall
 
 all: $(shared_object)
 
@@ -54,7 +52,7 @@ install:
 	/usr/bin/install -m 644 $(shared_object) $(INST_LIB_DIR)
 
 uninstall:
-	rm -f $(INST_LIB_DIR)/$(peripheral_name).$(SO_EXT)
+	rm -f $(INST_LIB_DIR)/$(plugin_name).$(SO_EXT)
 
 .PHONY : clean install uninstall
 

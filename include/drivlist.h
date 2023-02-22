@@ -74,8 +74,8 @@ struct PDESC pdesc[] = {
  
     {"null", 1, "null", 0x0, 0 },
     {"serout8", 2, "serout", 0xff, 8 },
-    {"qtr8", 3, "qtr8", 0xff, 8 },
-    {"qtr4", 4, "qtr4", 0xf, 4 },
+    {"rcc8", 3, "rcc8", 0xff, 8 },
+    {"rcc4", 4, "rcc4", 0xf, 4 },
     {"ws2812", 5, "ws2812", 0xf, 4 },
     {"rcrx", 6, "rcrx", 0xe, 4 },
     {"serout4", 7, "serout", 0xf, 4 },

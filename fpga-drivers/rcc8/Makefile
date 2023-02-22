@@ -19,7 +19,7 @@
 #               in a non-GPLv2 compliant manner.
 #
 
-peripheral_name = qtr8
+peripheral_name = rcc8
 
 INC = ../../include
 LIB = ../../build/lib

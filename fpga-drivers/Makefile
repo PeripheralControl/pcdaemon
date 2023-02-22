@@ -61,8 +61,8 @@ all:
 	make -C pwmout4 all
 	make -C avr all
 	make -C dac8 all
-	make -C qtr4 all
-	make -C qtr8 all
+	make -C rcc4 all
+	make -C rcc8 all
 	make -C serout all
 	make -C hostserial all
 	make -C bootflash all
@@ -109,8 +109,8 @@ clean:
 	make -C pwmout4 clean
 	make -C avr clean
 	make -C dac8 clean
-	make -C qtr4 clean
-	make -C qtr8 clean
+	make -C rcc4 clean
+	make -C rcc8 clean
 	make -C serout clean
 	make -C hostserial clean
 	make -C bootflash clean
@@ -157,8 +157,8 @@ install:
 	make INST_LIB_DIR=$(INST_LIB_DIR) -C pwmout4 install
 	make INST_LIB_DIR=$(INST_LIB_DIR) -C avr install
 	make INST_LIB_DIR=$(INST_LIB_DIR) -C dac8 install
-	make INST_LIB_DIR=$(INST_LIB_DIR) -C qtr4 install
-	make INST_LIB_DIR=$(INST_LIB_DIR) -C qtr8 install
+	make INST_LIB_DIR=$(INST_LIB_DIR) -C rcc4 install
+	make INST_LIB_DIR=$(INST_LIB_DIR) -C rcc8 install
 	make INST_LIB_DIR=$(INST_LIB_DIR) -C serout install
 	make INST_LIB_DIR=$(INST_LIB_DIR) -C hostserial install
 	make INST_LIB_DIR=$(INST_LIB_DIR) -C bootflash install
@@ -206,8 +206,8 @@ uninstall:
 	make INST_LIB_DIR=$(INST_LIB_DIR) -C pwmout4 uninstall
 	make INST_LIB_DIR=$(INST_LIB_DIR) -C avr uninstall
 	make INST_LIB_DIR=$(INST_LIB_DIR) -C dac8 uninstall
-	make INST_LIB_DIR=$(INST_LIB_DIR) -C qtr4 uninstall
-	make INST_LIB_DIR=$(INST_LIB_DIR) -C qtr8 uninstall
+	make INST_LIB_DIR=$(INST_LIB_DIR) -C rcc4 uninstall
+	make INST_LIB_DIR=$(INST_LIB_DIR) -C rcc8 uninstall
 	make INST_LIB_DIR=$(INST_LIB_DIR) -C serout uninstall
 	make INST_LIB_DIR=$(INST_LIB_DIR) -C hostserial install
 	make INST_LIB_DIR=$(INST_LIB_DIR) -C bootflash uninstall
