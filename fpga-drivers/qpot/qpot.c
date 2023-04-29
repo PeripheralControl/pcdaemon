@@ -163,7 +163,7 @@ static void packet_hdlr(
     // (count = 9 = count plus two per pot times four pots)
     if (!(( //autosend packet (you'll get a autosend on all data writes)
            ((pkt->cmd & PC_CMD_AUTO_MASK) == PC_CMD_AUTO_DATA) &&
-            (pkt->reg == QCSPI_REG_MODE) && (pkt->count == 16))
+            (pkt->reg == QCSPI_REG_MODE) && (pkt->count == 9))
           ||    ( // write response packet for mosi data packet
            ((pkt->cmd & PC_CMD_AUTO_MASK) != PC_CMD_AUTO_DATA) &&
             (pkt->reg == QCSPI_REG_COUNT) && (pkt->count == 9)))) {

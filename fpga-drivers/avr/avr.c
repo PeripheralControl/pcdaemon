@@ -113,11 +113,11 @@ enum TaskIds
 };
 
 // returned packet reply data offsets
-#define REPLY_DATA_BYTE0    2
-#define REPLY_DATA_BYTE1    3
-#define REPLY_DATA_BYTE2    4
-#define REPLY_DATA_BYTE3    5
-#define REPLY_DATA_BYTE4    6
+#define REPLY_DATA_BYTE0    0
+#define REPLY_DATA_BYTE1    1
+#define REPLY_DATA_BYTE2    2
+#define REPLY_DATA_BYTE3    3
+#define REPLY_DATA_BYTE4    4
 
 // UI aliases
 #define REG_INDEX cmdLineArgv[0]
@@ -384,7 +384,7 @@ static void packet_hdlr(
     // and number of bytes in SPI packet (nbxfer).
     if (!(( //autosend packet
            ((pkt->cmd & PC_CMD_AUTO_MASK) == PC_CMD_AUTO_DATA) &&
-            (pkt->reg == QCSPI_REG_MODE) && (pkt->count == 16))
+            (pkt->reg == QCSPI_REG_MODE) && (pkt->count == (1 + pctx->nbxfer)))
           ||    ( // write response packet for mosi data packet
            ((pkt->cmd & PC_CMD_AUTO_MASK) != PC_CMD_AUTO_DATA) &&
             (pkt->reg == QCSPI_REG_COUNT) && (pkt->count == (1 + pctx->nbxfer)))

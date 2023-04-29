@@ -183,7 +183,7 @@ static void packet_hdlr(
     // and the number of bytes in the SPI packet (nbxfer).
     if (!(( //autosend packet
            ((pkt->cmd & PC_CMD_AUTO_MASK) == PC_CMD_AUTO_DATA) &&
-            (pkt->reg == QCSPI_REG_MODE) && (pkt->count == 16))
+            (pkt->reg == QCSPI_REG_MODE) && (pkt->count == (1 + pCtx->nbxfer)))
           ||    ( // write response packet for mosi data packet
            ((pkt->cmd & PC_CMD_AUTO_MASK) != PC_CMD_AUTO_DATA) &&
             (pkt->reg == QCSPI_REG_COUNT) && (pkt->count == (1 + pCtx->nbxfer)))

@@ -193,7 +193,7 @@ static void packet_hdlr(
     // and the number of bytes in the SPI packet (nbxfer).
     if (!(( //autosend packet
            ((pkt->cmd & PC_CMD_AUTO_MASK) == PC_CMD_AUTO_DATA) &&
-            (pkt->reg == QCSPI_REG_MODE) && (pkt->count == 16))
+            (pkt->reg == QCSPI_REG_MODE) && (pkt->count == pctx->nbxfer))
           ||    ( // write response packet for mosi data packet
            ((pkt->cmd & PC_CMD_AUTO_MASK) != PC_CMD_AUTO_DATA) &&
             (pkt->reg == QCSPI_REG_COUNT) && (pkt->count == pctx->nbxfer))
@@ -214,39 +214,39 @@ static void packet_hdlr(
     // depending on which resource was requested.
     // Data in the chip is in BCD format.  We have to convert to binary
     if (pctx->getrsc == RSC_TIME) {
-        sec   = ((pkt->data[0x04] >> 4) & 0x07) * 10;
-        sec  += pkt->data[0x04] & 0x0f;
-        min   = ((pkt->data[0x05] >> 4) & 0x07) * 10;
-        min  += pkt->data[0x05] & 0x0f;
-        hour  = ((pkt->data[0x06] >> 4) & 0x07) * 10;
-        hour += pkt->data[0x06] & 0x0f;
-        day   = ((pkt->data[0x07] >> 4) & 0x03) * 10;
-        day  += pkt->data[0x07] & 0x0f;
-        mon   = ((pkt->data[0x09] >> 4) & 0x01) * 10;
-        mon  += pkt->data[0x09] & 0x0f;
-        year  = ((pkt->data[0x0a] >> 4) & 0x0f) * 10;
-        year += (pkt->data[0x0a] & 0x0f) + 2000;
+        sec   = ((pkt->data[0x02] >> 4) & 0x07) * 10;
+        sec  += pkt->data[0x02] & 0x0f;
+        min   = ((pkt->data[0x03] >> 4) & 0x07) * 10;
+        min  += pkt->data[0x03] & 0x0f;
+        hour  = ((pkt->data[0x04] >> 4) & 0x07) * 10;
+        hour += pkt->data[0x04] & 0x0f;
+        day   = ((pkt->data[0x05] >> 4) & 0x03) * 10;
+        day  += pkt->data[0x05] & 0x0f;
+        mon   = ((pkt->data[0x07] >> 4) & 0x01) * 10;
+        mon  += pkt->data[0x07] & 0x0f;
+        year  = ((pkt->data[0x08] >> 4) & 0x0f) * 10;
+        year += (pkt->data[0x08] & 0x0f) + 2000;
         ob_len = snprintf(ob, MXLINELN-1, "%4d-%02d-%02d %02d:%02d:%02d\n",
                      year, mon, day, hour, min, sec);
     }
     else if (pctx->getrsc == RSC_ALARM) {
-        amin   = ((pkt->data[0x0b] >> 4) & 0x07) * 10;
-        amin  += pkt->data[0x0b] & 0x0f;
-        ahour  = ((pkt->data[0x0c] >> 4) & 0x07) * 10;
-        ahour += pkt->data[0x0c] & 0x0f;
-        aday   = ((pkt->data[0x0d] >> 4) & 0x03) * 10;
-        aday  += pkt->data[0x0d] & 0x0f;
+        amin   = ((pkt->data[0x09] >> 4) & 0x07) * 10;
+        amin  += pkt->data[0x09] & 0x0f;
+        ahour  = ((pkt->data[0x0a] >> 4) & 0x07) * 10;
+        ahour += pkt->data[0x0a] & 0x0f;
+        aday   = ((pkt->data[0x0b] >> 4) & 0x03) * 10;
+        aday  += pkt->data[0x0b] & 0x0f;
         ob_len = snprintf(ob, MXLINELN-1, "%02d %02d:%02d\n",
                      aday, ahour, amin);
     }
     else if (pctx->getrsc == RSC_STATE) {
-        if (pkt->data[3] == 0x00)
+        if (pkt->data[1] == 0x00)
             ob_len = sprintf(ob, "off\n");
-        else if (pkt->data[3] == 0x02)
+        else if (pkt->data[1] == 0x02)
             ob_len = sprintf(ob, "enabled\n");
-        else if (pkt->data[3] == 0x0a)
+        else if (pkt->data[1] == 0x0a)
             ob_len = sprintf(ob, "alarm\n");
-        else if ((pkt->data[3] & 0x40) == 0x40)
+        else if ((pkt->data[1] & 0x40) == 0x40)
             ob_len = sprintf(ob, "on\n");
         else
             ob_len = sprintf(ob, "unknown\n");
@@ -326,7 +326,6 @@ static void user_hdlr(
         // lock the ui, and recort the number of bytes sent
         pctx->getrsc = rscid;
         pslot->rsc[rscid].uilock = (char) cn;
-        pctx->nbxfer = pkt.data[0];
     }
     else if ((cmd == PCSET) && (rscid == RSC_TIME)) {
         // 2018-09-21 14:45:23
@@ -394,6 +393,7 @@ static void user_hdlr(
     pkt.core = (pslot->pcore)->core_id;
     pkt.reg = QCSPI_REG_COUNT;
     pkt.count = pkt.data[0];       // sending count plus all SPI pkt bytes
+    pctx->nbxfer = pkt.data[0];
     // try to send the packet.  Schedule a resend on tx failure
 
     txret = pc_tx_pkt(pmycore, &pkt, 4 + pkt.count); // 4 header + data
