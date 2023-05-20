@@ -122,6 +122,7 @@ struct PDESC pdesc[] = {
     {"cvcc", 48, "cvcc", 0x1, 4 },
     {"vgaterm", 49, "vgaterm", 0xff, 8 },
     {"dgspi", 50, "dgspi", 0xb, 4 },
+    {"sndgen", 51, "sndgen", 0xf, 4 },
 };
 
 #define NPERI (sizeof(pdesc) / sizeof(struct PDESC))
