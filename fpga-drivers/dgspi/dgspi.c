@@ -21,6 +21,8 @@
  *  Resources:
  *    data      - read/write resource to send/receive SPI data
  *    config    - SPI port configuration including clock speed, and CS config
+ *    polltime  - automatic poll time in units of 0.01 seconds
+ *    polldata  - data stream from automatic polls
  *
  *
  * Copyright:   Copyright (C) 2015-2023 Demand Peripherals, Inc.
@@ -59,7 +61,8 @@
  **************************************************************/
         // register definitions
 #define DGSPI_REG_MODE     0x00
-#define DGSPI_REG_COUNT    0x01
+#define DGSPI_REG_POLLTIME 0x01
+#define DGSPI_REG_COUNT    0x02
 #define DGSPI_REG_SPI      0x02
 #define DGSPI_NDATA_BYTE   64
         // SPI definitions
@@ -73,11 +76,17 @@
 #define CLK_100K            3   // 100 KHz
         // misc constants
 #define MAX_LINE_LEN        100
-#define FN_CFG              "config"
-#define FN_DATA             "data"
-        // Resource index numbers
+#define SENDCONFIG          0
+#define SENDDATA            1
+        // Resource index numbers and names
 #define RSC_DATA            0
 #define RSC_CFG             1
+#define RSC_POLLTIME        2
+#define RSC_POLLDATA        3
+#define FN_DATA             "data"
+#define FN_CFG              "config"
+#define FN_POLLTIME         "polltime"
+#define FN_POLLDATA         "polldata"
 
 // dgspi local context
 typedef struct
@@ -91,6 +100,7 @@ typedef struct
     int      csmode;        // active high/low or forced high/low
     int      clksrc;        // The SCK frequency
     int      sckpol;        // SCK polarity.  0==MOSI valid on rising edge
+    int      polltime;      // auto send pkt to SPI device ever polltime 0.01 secs
 } DGSPIDEV;
 
 
@@ -100,7 +110,8 @@ typedef struct
 static void  packet_hdlr(SLOT *, PC_PKT *, int);
 static void  cb_data(int, int, char*, SLOT*, int, int*, char*);
 static void  cb_config(int, int, char*, SLOT*, int, int*, char*);
-static int   send_spi(DGSPIDEV*);
+static void  cb_polltime(int, int, char*, SLOT*, int, int*, char*);
+static int   send_spi(DGSPIDEV*, int);
 static void  no_ack(void *, DGSPIDEV*);
 extern int   pc_tx_pkt(CORE *pcore, PC_PKT *inpkt, int len);
 
@@ -124,6 +135,7 @@ int Initialize(
 
     pctx->pSlot = pslot;       // our instance of a peripheral
     pctx->ptimer = 0;          // set while waiting for a response
+    pctx->polltime = 0;        // disable poll timer by default
 
 
     // Register this slot's packet handler and private data
@@ -143,6 +155,18 @@ int Initialize(
     pslot->rsc[RSC_CFG].pgscb = cb_config;
     pslot->rsc[RSC_CFG].uilock = -1;
     pslot->rsc[RSC_CFG].slot = pslot;
+    pslot->rsc[RSC_POLLTIME].name = FN_POLLTIME;
+    pslot->rsc[RSC_POLLTIME].flags = IS_READABLE | IS_WRITABLE;
+    pslot->rsc[RSC_POLLTIME].bkey = 0;
+    pslot->rsc[RSC_POLLTIME].pgscb = cb_polltime;
+    pslot->rsc[RSC_POLLTIME].uilock = -1;
+    pslot->rsc[RSC_POLLTIME].slot = pslot;
+    pslot->rsc[RSC_POLLDATA].name = FN_POLLDATA;
+    pslot->rsc[RSC_POLLDATA].flags = CAN_BROADCAST;
+    pslot->rsc[RSC_POLLDATA].bkey = 0;
+    pslot->rsc[RSC_POLLDATA].pgscb = 0;
+    pslot->rsc[RSC_POLLDATA].uilock = -1;
+    pslot->rsc[RSC_POLLDATA].slot = pslot;
     pslot->name = "dgspi";
     pslot->desc = "generic SPI interface";
     pslot->help = README;
@@ -164,6 +188,8 @@ static void packet_hdlr(
     RSC    *prsc;
     DGSPIDEV *pCtx;
     int     i;         // loop through response bytes
+    char    ob[MAX_LINE_LEN*3];
+    int     ob_len = 0;
 
     prsc = &(pslot->rsc[RSC_DATA]);
     pCtx = (DGSPIDEV *)(pslot->priv);
@@ -179,7 +205,7 @@ static void packet_hdlr(
             (pkt->reg == DGSPI_REG_COUNT) && (pkt->count == (1 + pCtx->nbxfer)))
           ||     ( // write response packet for config
            (((pkt->cmd & PC_CMD_AUTO_MASK) != PC_CMD_AUTO_DATA) &&
-            (pkt->reg == DGSPI_REG_MODE) && (pkt->count == 1))) ) ) {
+            (pkt->reg == DGSPI_REG_MODE) && (pkt->count == 2))) ) ) {
         // unknown packet
         pclog("invalid dgspi packet from board to host");
         return;
@@ -193,20 +219,30 @@ static void packet_hdlr(
     }
 
     // Send data to UI
-    char ob[MAX_LINE_LEN*3] = {0};
-    int ob_len = 0;
     for(i = 0; i < pCtx->nbxfer; i++) {
         sprintf(&ob[i * 3],"%02x ", pkt->data[i]);
     }
     sprintf(&ob[i * 3], "\n");
     ob_len = (i * 3) + 1;
-    send_ui(ob, ob_len, prsc->uilock);
-    prompt(prsc->uilock);
 
-    // Response sent so clear the lock
-    prsc->uilock = -1;
-    del_timer(pCtx->ptimer);  //Got the response
-    pCtx->ptimer = 0;
+    // If uilock is set then this data goes to the UI
+    // else it is from the autopoll and goes the broadcast resource
+    if (prsc->uilock != -1) {
+        send_ui(ob, ob_len, prsc->uilock);
+        prompt(prsc->uilock);
+        // Response sent so clear the lock
+        prsc->uilock = -1;
+        del_timer(pCtx->ptimer);  //Got the response
+        pCtx->ptimer = 0;
+    }
+    else {
+        // not response, must be an autosend
+        prsc = &(pslot->rsc[RSC_POLLDATA]);
+        if (prsc->bkey != 0) {
+            // bkey will return cleared if UIs are no longer monitoring us
+            bcst_ui(ob, ob_len, &(prsc->bkey));
+        }
+    }
     return;
 }
 
@@ -247,7 +283,7 @@ static void cb_data(
         }
 
         if (pCtx->nbxfer != 0) {
-            txret = send_spi(pCtx);
+            txret = send_spi(pCtx, SENDDATA);
             if (txret != 0) {
                 *plen = snprintf(buf, *plen, E_WRFPGA);
                 // (errors are handled in calling routine)
@@ -292,9 +328,8 @@ static void cb_config(
     int      newcsmode = -1;
     int      newpol;
     char     ibuf[MAX_LINE_LEN];
-    int      outlen = 0;
+    int      txret;
 
-    RSC *prsc = &(pslot->rsc[RSC_DATA]);
     DGSPIDEV *pCtx = pslot->priv;
 
     if (cmd == PCSET) {
@@ -333,10 +368,7 @@ static void cb_config(
         pCtx->clksrc  = newclk;
         pCtx->sckpol  = newpol;
 
-        // Send just the config so set nbxfer to zero and then send the packet
-        pCtx->nbxfer = 0;
-
-        int txret = send_spi(pCtx);
+        txret = send_spi(pCtx, SENDCONFIG);
 
         if (txret != 0) {
             *plen = snprintf(buf, *plen, E_WRFPGA);
@@ -355,20 +387,60 @@ static void cb_config(
         else
             newclk = 100000;
         if (pCtx->csmode == CS_MODE_AL)
-            outlen = snprintf(ibuf, MAX_LINE_LEN, "%d %d al\n", newclk, pCtx->sckpol);
+            *plen = snprintf(buf, MAX_LINE_LEN, "%d %d al\n", newclk, pCtx->sckpol);
         else if (pCtx->csmode == CS_MODE_AH)
-            outlen = snprintf(ibuf, MAX_LINE_LEN, "%d %d ah\n", newclk, pCtx->sckpol);
+            *plen = snprintf(buf, MAX_LINE_LEN, "%d %d ah\n", newclk, pCtx->sckpol);
         else if (pCtx->csmode == CS_MODE_FL)
-            outlen = snprintf(ibuf, MAX_LINE_LEN, "%d %d fl\n", newclk, pCtx->sckpol);
+            *plen = snprintf(buf, MAX_LINE_LEN, "%d %d fl\n", newclk, pCtx->sckpol);
         else if (pCtx->csmode == CS_MODE_FH)
-            outlen = snprintf(ibuf, MAX_LINE_LEN, "%d %d fh\n", newclk, pCtx->sckpol);
-
-        prsc->uilock = (char) cn;
-        send_ui(ibuf, outlen, prsc->uilock);
-        prompt(prsc->uilock);
-        prsc->uilock = -1;
+            *plen = snprintf(buf, MAX_LINE_LEN, "%d %d fh\n", newclk, pCtx->sckpol);
+        // UI code handles case of plen < 1
     }
 
+    return;
+}
+
+
+/**************************************************************
+ * Callback to get/send polltime to user.
+ * Send config to peripheral if valid value.
+ * On pcget, return current configuration to UI.
+ **************************************************************/
+static void cb_polltime(
+    int      cmd,      //==PCGET if a read, ==PCSET on write
+    int      rscid,    // ID of resource being accessed
+    char    *val,      // new value for the resource
+    SLOT    *pslot,    // pointer to slot info.
+    int      cn,       // Index into UI table for requesting conn
+    int     *plen,     // size of buf on input, #char in buf on output
+    char    *buf)
+{
+    int      newpolltime = 0;
+    int      ret = 0;
+    int      txret;
+
+    DGSPIDEV *pCtx = pslot->priv;
+
+    if (cmd == PCGET) {
+        ret = snprintf(buf, *plen, "%d\n", pCtx->polltime);
+        *plen = ret;  // (errors are handled in calling routine)
+        return;
+    }
+    else if (cmd == PCSET) {
+        if (sscanf(val, "%d\n", &newpolltime) != 1) {
+            *plen = snprintf(buf, *plen,  E_BDVAL, pslot->rsc[rscid].name);
+            return;
+        }
+        pCtx->polltime = newpolltime;
+
+        txret = send_spi(pCtx, SENDCONFIG);
+
+        if (txret != 0) {
+            *plen = snprintf(buf, *plen, E_WRFPGA);
+            // (errors are handled in calling routine)
+            return;
+        }
+    }
     return;
 }
 
@@ -378,7 +450,8 @@ static void cb_config(
  * Returns 0 on success, or negative tx_pkt() error code.
  **************************************************************/
 static int send_spi(
-    DGSPIDEV *pCtx)    // This peripheral's context
+    DGSPIDEV *pCtx,    // This peripheral's context
+    int        type)   // Send config or data
 {
     PC_PKT   pkt;
     SLOT    *pmyslot;  // Our per slot info
@@ -393,11 +466,12 @@ static int send_spi(
     pkt.cmd = PC_CMD_OP_WRITE | PC_CMD_AUTOINC;
     pkt.core = pmycore->core_id;
 
-    if (pCtx->nbxfer == 0) {
+    if (type == SENDCONFIG) {
         // send the clock source and SPI mode
         pkt.data[0] = (pCtx->clksrc << 6) | (pCtx->csmode << 2) | (pCtx->sckpol << 1);
+        pkt.data[1] = pCtx->polltime & 0xff;
         pkt.reg = DGSPI_REG_MODE;
-        pkt.count = 1;
+        pkt.count = 2;
     }
     else {
         pkt.reg = DGSPI_REG_COUNT;
