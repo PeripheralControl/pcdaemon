@@ -8,7 +8,7 @@
  *              eight data bits, the parity bit, and the stop bit.
  * 
  *  Resources:
- *    data      - hex values of the received bytes (pccat only)
+ *    data      - hex values of the received bytes (pccat) or one byte to send.
  *
  * Copyright:   Copyright (C) 2015-2023 Demand Peripherals, Inc.
  *              All rights reserved.
@@ -48,6 +48,8 @@
 #define MAX_LINE_LEN        100
         // Resource index numbers
 #define RSC_DATAIN          0
+        // PS/2 reset command
+#define PS2_RESET           0xFF
 
 
 /**************************************************************
@@ -58,7 +60,6 @@ typedef struct
 {
     void    *pslot;    // handle to peripheral's slot info
     void    *ptimer;   // timer to watch for dropped ACK packets
-    int      intrr;    // interrupt-on-change mask
 } PS2DEV;
 
 
@@ -66,6 +67,8 @@ typedef struct
  *  - Function prototypes
  **************************************************************/
 static void packet_hdlr(SLOT *, PC_PKT *, int);
+static void ps2xmit(int, int, char*, SLOT*, int, int*, char*);
+static void noAck(void *, PS2DEV *);
 extern int  pc_tx_pkt(CORE *pcore, PC_PKT *inpkt, int len);
 
 
@@ -87,8 +90,7 @@ int Initialize(
     }
 
     // Init our PS2DEV structure
-    pctx->pslot = pslot;       // our instance of a peripheral
-    pctx->intrr = 0;           // Matches Verilog default value
+    pctx->pslot = pslot;        // our instance of a peripheral
 
     // Register this slot's packet handler and private data
     (pslot->pcore)->pcb  = packet_hdlr;
@@ -96,9 +98,9 @@ int Initialize(
 
     // Add handlers for user visible resources
     pslot->rsc[RSC_DATAIN].name = "data";
-    pslot->rsc[RSC_DATAIN].flags = CAN_BROADCAST;
+    pslot->rsc[RSC_DATAIN].flags = IS_WRITABLE | CAN_BROADCAST;
     pslot->rsc[RSC_DATAIN].bkey = 0;
-    pslot->rsc[RSC_DATAIN].pgscb = 0;
+    pslot->rsc[RSC_DATAIN].pgscb = ps2xmit;
     pslot->rsc[RSC_DATAIN].uilock = -1;
     pslot->rsc[RSC_DATAIN].slot = pslot;
     pslot->name = "ps2";
@@ -117,6 +119,7 @@ static void packet_hdlr(
     int     len)       // number of bytes in the received packet
 {
     RSC    *prsc;      // pointer to this slot's data resource
+    PS2DEV *pctx;      // context for this peripheral
     char    buf[MAX_LINE_LEN];
     int     bufidx;    // index into output buffer
     int     nchar;     // number of keyboard/mouse bytes received
@@ -125,7 +128,14 @@ static void packet_hdlr(
     int     i,j;       // loop counters
 
     prsc = &(pslot->rsc[RSC_DATAIN]);
+    pctx = (PS2DEV *)(pslot->priv);
 
+    //  write response packet for command byte.  Each byte has 11 bits
+    if  (((pkt->cmd & PC_CMD_AUTO_MASK) != PC_CMD_AUTO_DATA) &&
+         (pkt->reg == PS2_REG_DATA) && (pkt->count == 11)) {
+        del_timer(pctx->ptimer);  //Got the response
+        return;
+    }
 
     // Sanity check.   A valid packet will have a multiple of 10
     // bytes, be from the reg #0, and be an autosend
@@ -164,4 +174,95 @@ static void packet_hdlr(
 }
 
 
+
+/**************************************************************
+ * ps2xmit():  - The user is sending an PS/2 command.  Get the
+ * value, break it into individual bits, and send it down to
+ * the FPGA card.
+ **************************************************************/
+static void ps2xmit(
+    int      cmd,      //==PCGET if a read, ==PCSET on write
+    int      rscid,    // ID of resource being accessed
+    char    *val,      // new value for the resource
+    SLOT    *pslot,    // pointer to slot info.
+    int      cn,       // Index into UI table for requesting conn
+    int     *plen,     // size of buf on input, #char in buf on output
+    char    *buf)
+{
+    PC_PKT   pkt;      // packet to the FPGA
+    PS2DEV  *pctx;     // our local info
+    CORE    *pmycore;  // FPGA peripheral info
+    int      ret;      // return count
+    int      xmitval;  // byte to send to the keyboard
+    int      txret;    // ==0 if the packet went out OK
+    int      i;        // generic loop counter 
+    int      parity = 1;   // odd parity
+
+    pctx = (PS2DEV *) pslot->priv;
+    pmycore = pslot->pcore;
+
+    // Return if not a PCSET command.  Must be from a pccat.
+    if (cmd != PCSET) {
+        return;
+    }
+
+    // Get command byte from user
+    ret = sscanf(val, "%x", &xmitval);
+    if (ret != 1) {
+        ret = snprintf(buf, *plen,  E_BDVAL, pslot->rsc[rscid].name);
+        *plen = ret;
+        return;
+    }
+
+    // Build and send the write command to the PS/2
+    pkt.cmd = PC_CMD_OP_WRITE | PC_CMD_AUTOINC;
+    pkt.core = pmycore->core_id;
+    pkt.reg = PS2_REG_DATA;
+    pkt.count = 11;  // start, 8 data, parity, stop
+
+    // Break the value into bits and load the 11 bits in to registers.
+    // Data is sent LSB first and with odd parity.
+    pkt.data[0] = 0;                       // start bit is low
+    for (i = 1; i < 9; i++) {
+        pkt.data[i] = xmitval & 0x01;
+        parity = parity ^ pkt.data[i];
+        xmitval = xmitval >> 1;
+    }
+    pkt.data[9] = parity;                  // parity bit
+    pkt.data[10] = 1;                      // stop bit is high
+
+    // Packet is ready, now send it
+    txret = pc_tx_pkt(pmycore, &pkt, 4 + pkt.count); // 4 header + data
+    if (txret != 0) {
+        // the send of the byte did not succeed.  This probably means
+        // the input buffer to the USB/serial port is full.
+        // Tell the user of the problem.
+        ret = snprintf(buf, *plen, E_WRFPGA);
+        *plen = ret;  // (errors are handled in calling routine)
+        return;
+    }
+
+    // Start timer to look for a write response.
+    if (pctx->ptimer == 0)
+        pctx->ptimer = add_timer(PC_ONESHOT, 100, noAck, (void *) pctx);
+
+    *plen = 0;   // no response to user on xmit
+
+    return;
+}
+
+
+/**************************************************************
+ * noAck():  Wrote to the board but did not get a reply.  Handle
+ * the timeout for this.
+ **************************************************************/
+static void noAck(
+    void    *timer,   // handle of the timer that expired
+    PS2DEV  *pctx)    // the context of this peripheral
+{
+    // Log the missing ack
+    pclog(E_NOACK);
+
+    return;
+}
 // end of ps2.c
