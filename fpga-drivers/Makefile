@@ -70,6 +70,7 @@ all:
 	make -C bootflash all
 	make -C vgaterm all
 	make -C dgspi all
+	make -C ps2 all
 
 clean:
 	make -C enumerator clean
@@ -122,6 +123,7 @@ clean:
 	make -C bootflash clean
 	make -C vgaterm clean
 	make -C dgspi clean
+	make -C ps2 clean
 
 install:
 	make INST_LIB_DIR=$(INST_LIB_DIR) -C enumerator install
@@ -174,6 +176,7 @@ install:
 	make INST_LIB_DIR=$(INST_LIB_DIR) -C bootflash install
 	make INST_LIB_DIR=$(INST_LIB_DIR) -C vgaterm install
 	make INST_LIB_DIR=$(INST_LIB_DIR) -C dgspi install
+	make INST_LIB_DIR=$(INST_LIB_DIR) -C ps2 install
 	sudo ldconfig
 
 uninstall:
@@ -227,6 +230,7 @@ uninstall:
 	make INST_LIB_DIR=$(INST_LIB_DIR) -C bootflash uninstall
 	make INST_LIB_DIR=$(INST_LIB_DIR) -C vgaterm uninstall
 	make INST_LIB_DIR=$(INST_LIB_DIR) -C dgspi uninstall
+	make INST_LIB_DIR=$(INST_LIB_DIR) -C ps2 uninstall
 	sudo ldconfig
 
 .PHONY : clean install uninstall
