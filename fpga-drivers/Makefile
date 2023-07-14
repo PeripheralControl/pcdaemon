@@ -27,6 +27,7 @@ all:
 	make -C axo2 all
 	make -C basys3 all
 	make -C stpxo2 all
+	make -C runber all
 	make -C bb4io all
 	make -C irio all
 	make -C gpio4 all
@@ -80,6 +81,7 @@ clean:
 	make -C axo2 clean
 	make -C basys3 clean
 	make -C stpxo2 clean
+	make -C runber clean
 	make -C bb4io clean
 	make -C irio clean
 	make -C gpio4 clean
@@ -133,6 +135,7 @@ install:
 	make INST_LIB_DIR=$(INST_LIB_DIR) -C axo2 install
 	make INST_LIB_DIR=$(INST_LIB_DIR) -C basys3 install
 	make INST_LIB_DIR=$(INST_LIB_DIR) -C stpxo2 install
+	make INST_LIB_DIR=$(INST_LIB_DIR) -C runber install
 	make INST_LIB_DIR=$(INST_LIB_DIR) -C bb4io install
 	make INST_LIB_DIR=$(INST_LIB_DIR) -C irio install
 	make INST_LIB_DIR=$(INST_LIB_DIR) -C gpio4 install
@@ -187,6 +190,7 @@ uninstall:
 	make INST_LIB_DIR=$(INST_LIB_DIR) -C axo2 uninstall
 	make INST_LIB_DIR=$(INST_LIB_DIR) -C basys3 uninstall
 	make INST_LIB_DIR=$(INST_LIB_DIR) -C stpxo2 uninstall
+	make INST_LIB_DIR=$(INST_LIB_DIR) -C runber uninstall
 	make INST_LIB_DIR=$(INST_LIB_DIR) -C bb4io uninstall
 	make INST_LIB_DIR=$(INST_LIB_DIR) -C irio uninstall
 	make INST_LIB_DIR=$(INST_LIB_DIR) -C gpio4 uninstall

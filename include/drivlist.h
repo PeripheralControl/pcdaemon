@@ -107,7 +107,7 @@ struct PDESC pdesc[] = {
     {"dpqpot", 33, "dpespi", 0x7, 4 },
     {"dprtc", 34, "dpespi", 0x7, 4 },
     {"dpavr", 35, "dpespi", 0x7, 4 },
-    {"dpadc812", 36, "dpadc12", 0x7, 4 },
+    {"adc812", 36, "dpadc12", 0x7, 4 },
     {"dpslide4", 37, "dpadc12", 0x7, 4 },
     {"dptif", 38, "dptif", 0x7, 4 },
     {"dpus8", 39, "dpus8", 0x7, 4 },
@@ -124,6 +124,7 @@ struct PDESC pdesc[] = {
     {"dgspi", 50, "dgspi", 0xb, 4 },
     {"sndgen", 51, "sndgen", 0xf, 4 },
     {"ps2", 52, "ps2", 0xf, 4 },
+    {"runber", 53, "runber", 0x0, 0 },
 };
 
 #define NPERI (sizeof(pdesc) / sizeof(struct PDESC))
