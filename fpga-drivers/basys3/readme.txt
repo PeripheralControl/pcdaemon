@@ -23,7 +23,7 @@ the text message must be taken from the following set:
         o L r h H - u
         (space) (underscore) (decimal point)
 
-    The bb4io peripheral is a 'board peripheral' and so has
+    The basys3 peripheral is a 'board peripheral' and so has
 the list of driver IDs that the daemon loads at daemon
 start time.  
 
