@@ -177,7 +177,6 @@ static void packet_hdlr(
 
         del_timer(pctx->ptimer);  //Got the response
         pctx->ptimer = 0;
-
         // Process each driver ID in the response
         // Allocate slots starting from zero.  
         slot = 0;
@@ -310,7 +309,7 @@ static void getdriverlist(
 
     // Start timer to look for a read response.
     if (pctx->ptimer == 0)
-        pctx->ptimer = add_timer(PC_ONESHOT, 100, noAck, (void *) pctx);
+        pctx->ptimer = add_timer(PC_ONESHOT, 1000, noAck, (void *) pctx);
 
     return;
 }
@@ -322,10 +321,13 @@ static void getdriverlist(
  **************************************************************/
 static void noAck(
     void     *timer,   // handle of the timer that expired
-    ENUMDEV *pctx)    // 
+    ENUMDEV  *pctx)
 {
     // Log the missing ack
     pclog(E_NOACK);
+    del_timer(pctx->ptimer);  // clear the old timer, and
+    pctx->ptimer = 0;
+    getdriverlist(pctx);      // try again
 
     return;
 }
