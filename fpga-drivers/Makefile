@@ -44,13 +44,13 @@ all:
 	make -C out4 all
 	make -C out4l all
 	make -C out32 all
-	make -C lcd6 all
+	make -C dplcd6 all
 	make -C ping4 all
 	make -C ei2c all
 	make -C espi all
 	make -C tif all
 	make -C io8 all
-	make -C us8 all
+	make -C dpus8 all
 	make -C touch4 all
 	make -C count4 all
 	make -C ws2812 all
@@ -99,13 +99,13 @@ clean:
 	make -C out4 clean
 	make -C out4l clean
 	make -C out32 clean
-	make -C lcd6 clean
+	make -C dplcd6 clean
 	make -C ping4 clean
 	make -C ei2c clean
 	make -C espi clean
 	make -C tif clean
 	make -C io8 clean
-	make -C us8 clean
+	make -C dpus8 clean
 	make -C touch4 clean
 	make -C count4 clean
 	make -C ws2812 clean
@@ -154,13 +154,13 @@ install:
 	make INST_LIB_DIR=$(INST_LIB_DIR) -C out4 install
 	make INST_LIB_DIR=$(INST_LIB_DIR) -C out4l install
 	make INST_LIB_DIR=$(INST_LIB_DIR) -C out32 install
-	make INST_LIB_DIR=$(INST_LIB_DIR) -C lcd6 install
+	make INST_LIB_DIR=$(INST_LIB_DIR) -C dplcd6 install
 	make INST_LIB_DIR=$(INST_LIB_DIR) -C ping4 install
 	make INST_LIB_DIR=$(INST_LIB_DIR) -C ei2c install
 	make INST_LIB_DIR=$(INST_LIB_DIR) -C espi install
 	make INST_LIB_DIR=$(INST_LIB_DIR) -C tif install
 	make INST_LIB_DIR=$(INST_LIB_DIR) -C io8 install
-	make INST_LIB_DIR=$(INST_LIB_DIR) -C us8 install
+	make INST_LIB_DIR=$(INST_LIB_DIR) -C dpus8 install
 	make INST_LIB_DIR=$(INST_LIB_DIR) -C touch4 install
 	make INST_LIB_DIR=$(INST_LIB_DIR) -C count4 install
 	make INST_LIB_DIR=$(INST_LIB_DIR) -C ws2812 install
@@ -210,13 +210,13 @@ uninstall:
 	make INST_LIB_DIR=$(INST_LIB_DIR) -C out4 uninstall
 	make INST_LIB_DIR=$(INST_LIB_DIR) -C out4l uninstall
 	make INST_LIB_DIR=$(INST_LIB_DIR) -C out32 uninstall
-	make INST_LIB_DIR=$(INST_LIB_DIR) -C lcd6 uninstall
+	make INST_LIB_DIR=$(INST_LIB_DIR) -C dplcd6 uninstall
 	make INST_LIB_DIR=$(INST_LIB_DIR) -C ping4 uninstall
 	make INST_LIB_DIR=$(INST_LIB_DIR) -C ei2c uninstall
 	make INST_LIB_DIR=$(INST_LIB_DIR) -C espi uninstall
 	make INST_LIB_DIR=$(INST_LIB_DIR) -C tif uninstall
 	make INST_LIB_DIR=$(INST_LIB_DIR) -C io8 uninstall
-	make INST_LIB_DIR=$(INST_LIB_DIR) -C us8 uninstall
+	make INST_LIB_DIR=$(INST_LIB_DIR) -C dpus8 uninstall
 	make INST_LIB_DIR=$(INST_LIB_DIR) -C touch4 uninstall
 	make INST_LIB_DIR=$(INST_LIB_DIR) -C count4 uninstall
 	make INST_LIB_DIR=$(INST_LIB_DIR) -C ws2812 uninstall

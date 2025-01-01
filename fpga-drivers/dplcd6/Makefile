@@ -19,7 +19,7 @@
 #               in a non-GPLv2 compliant manner.
 #
 
-peripheral_name = lcd6
+peripheral_name = dplcd6
 
 INC = ../../include
 LIB = ../../build/lib

@@ -19,7 +19,7 @@
 #               in a non-GPLv2 compliant manner.
 #
 
-peripheral_name = us8
+peripheral_name = dpus8
 
 INC = ../../include
 LIB = ../../build/lib
