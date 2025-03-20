@@ -99,7 +99,7 @@
 #define FIFOSZ             120
         // Contrast control (0/1) may need to change depending
         // on the LCD you use
-#define CONTRAST_DEF       0x10
+#define CONTRAST_DEF       0x00
 
 
 /**************************************************************
