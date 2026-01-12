@@ -24,6 +24,7 @@ all:
 	make -C tonegen all
 	make -C sndgen all
 	make -C tang4k all
+	make -C tang25k all
 	make -C axo2 all
 	make -C basys3 all
 	make -C stpxo2 all
@@ -80,6 +81,7 @@ clean:
 	make -C tonegen clean
 	make -C sndgen clean
 	make -C tang4k clean
+	make -C tang25k clean
 	make -C axo2 clean
 	make -C basys3 clean
 	make -C stpxo2 clean
@@ -136,6 +138,7 @@ install:
 	make INST_LIB_DIR=$(INST_LIB_DIR) -C tonegen install
 	make INST_LIB_DIR=$(INST_LIB_DIR) -C sndgen install
 	make INST_LIB_DIR=$(INST_LIB_DIR) -C tang4k install
+	make INST_LIB_DIR=$(INST_LIB_DIR) -C tang25k install
 	make INST_LIB_DIR=$(INST_LIB_DIR) -C axo2 install
 	make INST_LIB_DIR=$(INST_LIB_DIR) -C basys3 install
 	make INST_LIB_DIR=$(INST_LIB_DIR) -C stpxo2 install
@@ -193,6 +196,7 @@ uninstall:
 	make INST_LIB_DIR=$(INST_LIB_DIR) -C tonegen uninstall
 	make INST_LIB_DIR=$(INST_LIB_DIR) -C sndgen uninstall
 	make INST_LIB_DIR=$(INST_LIB_DIR) -C tang4k uninstall
+	make INST_LIB_DIR=$(INST_LIB_DIR) -C tang25k uninstall
 	make INST_LIB_DIR=$(INST_LIB_DIR) -C axo2 uninstall
 	make INST_LIB_DIR=$(INST_LIB_DIR) -C basys3 uninstall
 	make INST_LIB_DIR=$(INST_LIB_DIR) -C stpxo2 uninstall

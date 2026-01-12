@@ -234,6 +234,7 @@ information on these peripherals.
 |[bb4io](fpga-drivers/bb4io/readme.txt) | Demand Peripherals Baseboard |
 |[stpxo2](fpga-drivers/stpxo2/readme.txt) | Step Mach XO2 |
 |[tang4k](fpga-drivers/tang4k/readme.txt) | Tang Nano 4K |
+|[tang25k](fpga-drivers/tang25k/readme.txt) | Tang Primer 25K |
 |[basys3](fpga-drivers/basys3/readme.txt) | Digilent Basys3 |
 | | |
 ***Non-FPGA***

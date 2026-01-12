@@ -90,7 +90,7 @@ void parse_and_execute(UI *pui)
     int      i;          // generic loop counter
 
 
-    if ((pui->cmd == 0) || (pui->cmd[0] == 0) || (pui->cmdindx >= MXCMD) ||
+    if ((pui->cmd[0] == 0) || (pui->cmdindx >= MXCMD) ||
         (pui->cmd[0] == '\n') || (pui->cmd[0] == '\r')) {
         return;   // nothing to do or an error
     }
