@@ -75,6 +75,8 @@ all:
 	make -C dgspi all
 	make -C ps2 all
 	make -C patgen64 all
+	make -C line7 all
+	make -C fgen all
 
 clean:
 	make -C enumerator clean
@@ -132,6 +134,8 @@ clean:
 	make -C dgspi clean
 	make -C ps2 clean
 	make -C patgen64 clean
+	make -C line7 clean
+	make -C fgen clean
 
 install:
 	make INST_LIB_DIR=$(INST_LIB_DIR) -C enumerator install
@@ -189,6 +193,8 @@ install:
 	make INST_LIB_DIR=$(INST_LIB_DIR) -C dgspi install
 	make INST_LIB_DIR=$(INST_LIB_DIR) -C ps2 install
 	make INST_LIB_DIR=$(INST_LIB_DIR) -C patgen64 install
+	make INST_LIB_DIR=$(INST_LIB_DIR) -C line7 install
+	make INST_LIB_DIR=$(INST_LIB_DIR) -C fgen install
 	sudo ldconfig
 
 uninstall:
@@ -247,6 +253,8 @@ uninstall:
 	make INST_LIB_DIR=$(INST_LIB_DIR) -C dgspi uninstall
 	make INST_LIB_DIR=$(INST_LIB_DIR) -C ps2 uninstall
 	make INST_LIB_DIR=$(INST_LIB_DIR) -C patgen64 uninstall
+	make INST_LIB_DIR=$(INST_LIB_DIR) -C line7 uninstall
+	make INST_LIB_DIR=$(INST_LIB_DIR) -C fgen uninstall
 	sudo ldconfig
 
 .PHONY : clean install uninstall
